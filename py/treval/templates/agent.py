@@ -10,32 +10,32 @@ treval.instrument()
 TOOLS = {}
 
 
-@tool(name="obtener_clima")
-def get_weather(ciudad: str) -> str:
+@tool(name="get_weather")
+def get_weather(city: str) -> str:
     """Gets the current weather for a city."""
     data = {
-        "Madrid": "28°C, soleado",
-        "Barcelona": "26°C, nubes",
-        "Londres": "15°C, lluvia",
+        "Madrid": "28°C, sunny",
+        "Barcelona": "26°C, cloudy",
+        "London": "15°C, rainy",
         "Tokyo": "22°C, humid",
-        "Nueva York": "24°C, parcialmente nublado",
+        "New York": "24°C, partly cloudy",
     }
-    return data.get(ciudad.capitalize(), f"No weather data for {ciudad}")
+    return data.get(city.capitalize(), f"No weather data for {city}")
 
 
-TOOLS["obtener_clima"] = get_weather
+TOOLS["get_weather"] = get_weather
 
 
-@tool(name="calcular")
-def calculate(expresion: str) -> float:
+@tool(name="calculate")
+def calculate(expression: str) -> float:
     """Evaluates a mathematical expression."""
-    allowed = re.sub(r"[0-9+\-*/.() ]", "", expresion)
+    allowed = re.sub(r"[0-9+\-*/.() ]", "", expression)
     if allowed:
         raise ValueError(f"Disallowed characters: {allowed}")
-    return eval(expresion)
+    return eval(expression)
 
 
-TOOLS["calcular"] = calculate
+TOOLS["calculate"] = calculate
 
 
 @agent(name="ReActBot")
@@ -61,12 +61,12 @@ class ReActAgent:
             for name, fn in TOOLS.items()
         )
         messages = [
-            {"role": "system", "content": f"You are a ReAct assistant. Tools:\n{tools_desc}\nFormat:\nFUNCION: name\nARGS: {{}}\n\nIf you have the answer, respond directly."},
+            {"role": "system", "content": f"You are a ReAct assistant. Tools:\n{tools_desc}\nFormat:\nFUNCTION: name\nARGS: {{}}\n\nIf you have the answer, respond directly."},
             {"role": "user", "content": question},
         ]
         for _ in range(5):
             response = self._call_llm(messages)
-            func_match = re.search(r"FUNCION:\s*(\w+)", response)
+            func_match = re.search(r"FUNCTION:\s*(\w+)", response)
             args_match = re.search(r"ARGS:\s*(\{.+?\})", response, re.DOTALL)
             if func_match and args_match:
                 func_name = func_match.group(1)

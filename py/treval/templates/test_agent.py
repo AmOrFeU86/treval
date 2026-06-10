@@ -9,7 +9,7 @@ suite = TestSuite(name="WeatherTests")
       criteria="The response should mention Madrid's weather")
 def test_madrid(response: str) -> None:
     assert "Madrid" in response
-    assert "28" in response or "soleado" in response
+    assert "28" in response or "sunny" in response
 
 
 @case(suite,
