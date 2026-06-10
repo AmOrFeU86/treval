@@ -1,0 +1,2 @@
+[console_scripts]
+treval = treval.cli:main
