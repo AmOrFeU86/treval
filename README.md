@@ -1,8 +1,14 @@
 # treval ⚡
 
 <p align="center">
+  <a href="https://pypi.org/project/treval/"><img src="https://img.shields.io/pypi/v/treval?color=blue" alt="PyPI version"></a>
+  <a href="https://pypi.org/project/treval/"><img src="https://img.shields.io/pypi/pyversions/treval" alt="Python versions"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/github/license/AmOrFeU86/treval" alt="License: MIT"></a>
+</p>
+
+<p align="center">
   <picture>
-    <img alt="treval logo" src="https://raw.githubusercontent.com/amorfeu86/treval/main/treval_logo_2.png" width="200" height="200">
+    <img alt="treval logo" src="https://raw.githubusercontent.com/AmOrFeU86/treval/main/treval_logo_2.png" width="200" height="200">
   </picture>
 </p>
 
@@ -18,11 +24,7 @@ Treval is an observability and evaluation framework for AI agents. With one line
 ## Installation
 
 ```bash
-git clone <your-repo>
-cd treval
-python -m venv .venv
-source .venv/bin/activate
-pip install -e .
+pip install treval
 ```
 
 **Dependencies:** `openai`, `rich` (the rest are Python 3.11+ stdlib).

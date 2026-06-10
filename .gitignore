@@ -29,3 +29,8 @@ Thumbs.db
 .pytest_cache/
 htmlcov/
 .coverage
+
+# Generated outputs
+compare_*.html
+ideas-framework.html
+dashboard_*.html

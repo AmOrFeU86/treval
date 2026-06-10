@@ -6,12 +6,12 @@ readme = "README.md"
 requires-python = ">=3.11"
 license = {text = "MIT"}
 authors = [
-    {name = "Treval Contributors"},
+    {name = "Gabriel Llaurado Queralt"},
 ]
 
 keywords = ["ai", "agents", "observability", "tracing", "evaluation", "llm", "monitoring"]
 classifiers = [
-    "Development Status :: 3 - Alpha",
+    "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
     "License :: OSI Approved :: MIT License",
@@ -27,8 +27,8 @@ dependencies = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/amorfeu86/treval"
-Repository = "https://github.com/amorfeu86/treval"
+Homepage = "https://github.com/AmOrFeU86/treval"
+Repository = "https://github.com/AmOrFeU86/treval"
 Documentation = "https://treval.dev"
 
 [build-system]
