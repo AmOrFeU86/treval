@@ -93,11 +93,18 @@ class SpanStore:
         """Updates fields of an existing span.
 
         fields can include: status, output, duration_ms, metadata.
+        A dict `metadata` is JSON-encoded (same as save() does), so
+        callers don't have to pre-encode and don't have to special-case
+        the difference between `save` and `update`.
         """
         allowed = {"status", "output", "duration_ms", "metadata", "name", "input"}
         updates = {k: v for k, v in fields.items() if k in allowed}
         if not updates:
             return
+        if "metadata" in updates:
+            md = updates["metadata"]
+            if md is not None and not isinstance(md, str):
+                updates["metadata"] = json.dumps(md)
         set_clause = ", ".join(f"{k} = ?" for k in updates)
         values = list(updates.values())
         values.append(span_id)
