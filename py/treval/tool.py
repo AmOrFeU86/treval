@@ -7,7 +7,7 @@ from treval.context import current_span_id
 from treval.db import SpanStore
 
 
-def tool(func=None, *, name=None):
+def tool(func=None, *, name=None, metadata_fn=None):
     """Decorator that marks a function as a traceable tool.
 
     Basic usage:
@@ -19,9 +19,22 @@ def tool(func=None, *, name=None):
         @treval.tool(name="search")
         def my_tool(query: str) -> str:
             return search(query)
+
+    With metadata callback:
+        @treval.tool(metadata_fn=lambda args, kwargs, result: {
+            "query": kwargs.get("query"),
+            "num_results": len(result),
+        })
+        def my_tool(query: str) -> list:
+            ...
+
+    The metadata_fn is called after a successful return with
+    (args, kwargs, result) and must return a dict (serialized as JSON in
+    the span's metadata column). On exception it is NOT called, leaving
+    metadata as NULL.
     """
     if func is None:
-        return lambda f: tool(f, name=name)
+        return lambda f: tool(f, name=name, metadata_fn=metadata_fn)
 
     @functools.wraps(func)
     def wrapper(*args, **kwargs):
@@ -30,9 +43,15 @@ def tool(func=None, *, name=None):
         start = time.perf_counter()
         status = "ok"
         output = None
+        metadata = None
         try:
             result = func(*args, **kwargs)
             output = _serialize(result)
+            if metadata_fn is not None:
+                try:
+                    metadata = metadata_fn(args, kwargs, result)
+                except Exception:
+                    metadata = None
             return result
         except BaseException as e:
             status = "error"
@@ -48,6 +67,7 @@ def tool(func=None, *, name=None):
                 input=_serialize((args, kwargs)),
                 output=output,
                 duration_ms=duration_ms,
+                metadata=metadata,
             )
 
     wrapper._treval_tool = True
