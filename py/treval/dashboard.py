@@ -31,6 +31,33 @@ def _build_html(store=None):
             except (json.JSONDecodeError, TypeError):
                 pass
     total = store.count()
+    # Aggregate tokens & cost
+    total_tokens = 0
+    total_cost = 0.0
+    _PRICES = {
+        "deepseek/deepseek-v4-flash": {"input": 0.0001, "output": 0.0004},
+        "deepseek/deepseek-v4-pro":   {"input": 0.0003, "output": 0.0012},
+        "deepseek/deepseek-r1":       {"input": 0.00055, "output": 0.00219},
+        "deepseek/deepseek-v3":       {"input": 0.00027, "output": 0.0011},
+    }
+    per_model_tokens = {}
+    for span in spans:
+        meta = span.get("metadata", {})
+        if isinstance(meta, dict):
+            tt = meta.get("total_tokens", 0) or 0
+            total_tokens += tt
+            model = meta.get("model", "")
+            if model:
+                pt = meta.get("prompt_tokens", 0) or 0
+                ct = meta.get("completion_tokens", 0) or 0
+                key = model
+                per_model_tokens.setdefault(key, {"pt": 0, "ct": 0})
+                per_model_tokens[key]["pt"] += pt
+                per_model_tokens[key]["ct"] += ct
+    for model, toks in per_model_tokens.items():
+        p = _PRICES.get(model)
+        if p:
+            total_cost += (p["input"] * toks["pt"] + p["output"] * toks["ct"]) / 1000
     stats = {
         "total": total,
         "AGENT": sum(1 for s in spans if s["type"] == "AGENT"),
@@ -38,6 +65,8 @@ def _build_html(store=None):
         "TOOL": sum(1 for s in spans if s["type"] == "TOOL"),
         "LLM": sum(1 for s in spans if s["type"] == "LLM"),
         "errors": sum(1 for s in spans if s["status"] == "error"),
+        "tokens": total_tokens,
+        "cost": round(total_cost, 6),
     }
     data = json.dumps({"spans": spans, "stats": stats}, default=str)
     return HTML_TEMPLATE.replace("__DATA__", data)
@@ -278,6 +307,7 @@ tr { animation: rowIn .2s ease both; }
 <th onclick="sortBy('name')">Name<span class="sort">&#x25B2;</span></th>
 <th onclick="sortBy('status')">Status<span class="sort">&#x25B2;</span></th>
 <th onclick="sortBy('duration_ms')">Duration<span class="sort">&#x25B2;</span></th>
+<th onclick="sortBy('tokens')">Tokens<span class="sort">&#x25B2;</span></th>
 <th>Parent</th>
 <th onclick="sortBy('created_at')">Started<span class="sort">&#x25B2;</span></th>
 </tr></thead>
@@ -324,11 +354,14 @@ function load() {
 function render(data) {
   var n = data.spans.length;
   document.getElementById("meta").textContent = n + " span" + (n !== 1 ? "s" : "") + " / " + data.stats.total + " total";
-  var cm = {total:"blue",AGENT:"blue",OPERATION:"green",TOOL:"yellow",LLM:"purple",errors:"red"};
-  var lm = {total:"Total",AGENT:"Agents",OPERATION:"Operations",TOOL:"Tools",LLM:"LLMs",errors:"Errors"};
+  var cm = {total:"blue",AGENT:"blue",OPERATION:"green",TOOL:"yellow",LLM:"purple",errors:"red",tokens:"blue",cost:"green"};
+  var lm = {total:"Total",AGENT:"Agents",OPERATION:"Operations",TOOL:"Tools",LLM:"LLMs",errors:"Errors",tokens:"Tokens",cost:"Cost"};
   var h = "";
   Object.keys(data.stats).forEach(function(k) {
-    h += '<div class="stat" title="' + (lm[k]||k) + ': ' + data.stats[k] + '"><div class="num ' + (cm[k]||"blue") + '">' + data.stats[k] + '</div><div class="label">' + (lm[k]||k) + '</div></div>';
+    var val = data.stats[k];
+    if (k === "cost") val = "$" + Number(val).toFixed(5);
+    else if (k === "tokens") val = Number(val).toLocaleString();
+    h += '<div class="stat" title="' + (lm[k]||k) + ': ' + val + '"><div class="num ' + (cm[k]||"blue") + '">' + val + '</div><div class="label">' + (lm[k]||k) + '</div></div>';
   });
   document.getElementById("stats").innerHTML = h;
   _DATA = data.spans;
@@ -369,6 +402,8 @@ function renderTable() {
     var cre = (s.created_at || "").slice(0, 19);
     var dotClass = s.status === "error" ? "dot-error" : "dot-ok";
     var depth = s.parent_id ? 1 : 0;
+    var toks = s.metadata ? (s.metadata.total_tokens || "") : "";
+    s.tokens = toks || 0;
 
     tr.innerHTML =
       '<td data-label="ID"><span class="id-cell">#' + s.id + '</span></td>' +
@@ -376,6 +411,7 @@ function renderTable() {
       '<td data-label="Name"><span class="tree-indent">' + (depth ? '&#x2514;&#x2500;' : '') + '</span>' + esc(s.name) + '</td>' +
       '<td data-label="Status"><span class="status-indicator"><span class="status-dot ' + dotClass + '"></span><span class="status-text" style="color:' + (s.status==="error"?"var(--red)":"var(--green)") + '">' + s.status + '</span></span></td>' +
       '<td data-label="Duration"><span class="duration-wrap"><span class="duration-bar"><span class="duration-bar-fill" style="width:' + durPct + '%;background:' + durColor + '"></span></span><span class="duration-text">' + durText + '</span></span></td>' +
+      '<td data-label="Tokens"><span class="duration-text">' + (toks ? toks : "&mdash;") + '</span></td>' +
       '<td data-label="Parent">' + (s.parent_id || "&mdash;") + '</td>' +
       '<td data-label="Started">' + cre + '</td>';
     tb.appendChild(tr);
@@ -392,7 +428,7 @@ function sortBy(field) {
   document.querySelectorAll("th .sort").forEach(function(s){s.style.opacity="0"});
   document.querySelectorAll("th").forEach(function(t){t.classList.remove("sorted")});
   var ths = document.querySelectorAll("th");
-  var idx = {id:0,type:1,name:2,status:3,duration_ms:4,created_at:6}[field];
+  var idx = {id:0,type:1,name:2,status:3,duration_ms:4,tokens:5,created_at:7}[field];
   if (ths[idx]) { ths[idx].classList.add("sorted"); ths[idx].querySelector(".sort").style.opacity = "1"; }
   if (_SORT.asc) { ths[idx].querySelector(".sort").innerHTML = "&#x25B2;"; }
   else { ths[idx].querySelector(".sort").innerHTML = "&#x25BC;"; }

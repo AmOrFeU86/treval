@@ -309,24 +309,12 @@ def cmd_gateway(args):
 def cmd_dashboard(args):
     """Start the local web dashboard or export to HTML."""
     if args.export:
-        import json
-        from treval.db import SpanStore
-        store = SpanStore()
-        spans = store.list_spans(limit=2000)
-        total = store.count()
-        stats = {
-            "total": total,
-            "AGENT": sum(1 for s in spans if s["type"] == "AGENT"),
-            "OPERATION": sum(1 for s in spans if s["type"] == "OPERATION"),
-            "TOOL": sum(1 for s in spans if s["type"] == "TOOL"),
-            "LLM": sum(1 for s in spans if s["type"] == "LLM"),
-            "errors": sum(1 for s in spans if s["status"] == "error"),
-        }
-        data = json.dumps({"spans": spans, "stats": stats}, default=str)
-        html = dashboard_html.replace("__DATA__", data)
+        from treval.dashboard import _build_html
+        html = _build_html()
         Path(args.export).write_text(html, encoding="utf-8")
+        spans_count = html.count("<tr")  # rough span count
         console.print(f"[green]✅ Dashboard exported to {args.export}[/green]")
-        console.print(f"   {len(spans)} spans · {total} total")
+        console.print(f"   {Path(args.export).stat().st_size:,} bytes")
         return
     dashboard_serve(port=args.port, open_browser=not args.no_open)
 
