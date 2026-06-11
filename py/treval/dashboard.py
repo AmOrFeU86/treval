@@ -23,6 +23,13 @@ def _build_html(store=None):
     if store is None:
         store = SpanStore()
     spans = store.list_spans(limit=200)
+    # Parse metadata from JSON string to dict (SQLite stores it as string)
+    for span in spans:
+        if isinstance(span.get("metadata"), str):
+            try:
+                span["metadata"] = json.loads(span["metadata"])
+            except (json.JSONDecodeError, TypeError):
+                pass
     total = store.count()
     stats = {
         "total": total,
@@ -295,6 +302,20 @@ tr { animation: rowIn .2s ease both; }
 var _EMBEDDED = __DATA__;
 var _SORT = { field: null, asc: true };
 
+// Model pricing (USD per 1K tokens)
+var _PRICES = {
+  "deepseek/deepseek-v4-flash": {input: 0.0001, output: 0.0004},
+  "deepseek/deepseek-v4-pro":   {input: 0.0003, output: 0.0012},
+  "deepseek/deepseek-r1":       {input: 0.00055, output: 0.00219},
+  "deepseek/deepseek-v3":       {input: 0.00027, output: 0.0011},
+};
+
+function estimateCost(model, pt, ct) {
+  var p = _PRICES[model];
+  if (!p) return null;
+  return (p.input * (pt||0) + p.output * (ct||0)) / 1000;
+}
+
 function load() {
   if (_EMBEDDED) { render(_EMBEDDED); }
   else { fetch("/api/spans?limit=200").then(function(r){return r.json()}).then(render); }
@@ -407,6 +428,26 @@ function showDetail(panel, s, id) {
   }
   var dotClass = s.status === "error" ? "dot-error" : "dot-ok";
   var closeId = 'close-detail-' + id;
+
+  function metaGrid(s) {
+    var m = s.metadata || {};
+    var model = m.model || "";
+    var pt = m.prompt_tokens;
+    var ct = m.completion_tokens;
+    var tt = m.total_tokens;
+    var cost = estimateCost(model, pt, ct);
+    var h = '<div class="detail-grid">';
+    if (model) h += '<div class="detail-field"><div class="fname">Model</div><div class="fval">' + esc(model) + '</div></div>';
+    if (tt != null) {
+      h += '<div class="detail-field"><div class="fname">Tokens</div><div class="fval">' + pt + '\u2191 + ' + ct + '\u2193 = ' + tt + '</div></div>';
+    }
+    if (cost != null) {
+      h += '<div class="detail-field"><div class="fname">Cost</div><div class="fval">$' + cost.toFixed(5) + '</div></div>';
+    }
+    h += '</div>';
+    return h;
+  }
+
   panel.innerHTML =
     '<div class="detail-card">' +
       '<div class="detail-header"><span class="type-badge type-' + s.type + '">' + s.type + '</span><h2>' + esc(s.name||"") + '</h2><span class="status-indicator"><span class="status-dot ' + dotClass + '"></span></span><span style="font-size:.78rem;color:var(--text2)">#' + s.id + '</span><button id="' + closeId + '" class="close-btn">&times;</button></div>' +
@@ -416,6 +457,7 @@ function showDetail(panel, s, id) {
         '<div class="detail-field"><div class="fname">Parent</div><div class="fval">' + (s.parent_id || "&mdash;") + '</div></div>' +
         '<div class="detail-field"><div class="fname">Started</div><div class="fval">' + (s.created_at || "&mdash;") + '</div></div>' +
       '</div>' +
+      (s.metadata ? metaGrid(s) : '') +
       '<div class="detail-grid">' +
         '<div class="detail-field"><div class="fname">Input</div><div class="fval"><pre>' + esc(s.input||"&mdash;") + '</pre></div></div>' +
         '<div class="detail-field"><div class="fname">Output</div><div class="fval"><pre>' + esc(s.output||"&mdash;") + '</pre></div></div>' +
