@@ -494,6 +494,8 @@ function showDetail(panel, s, id) {
         '<div class="detail-field"><div class="fname">Started</div><div class="fval">' + (s.created_at || "&mdash;") + '</div></div>' +
       '</div>' +
       (s.metadata ? metaGrid(s) : '') +
+      renderSources(s) +
+      renderRunStats(s) +
       '<div class="detail-grid">' +
         '<div class="detail-field"><div class="fname">Input</div><div class="fval"><pre>' + esc(s.input||"&mdash;") + '</pre></div></div>' +
         '<div class="detail-field"><div class="fname">Output</div><div class="fval"><pre>' + esc(s.output||"&mdash;") + '</pre></div></div>' +
@@ -513,6 +515,49 @@ function showDetail(panel, s, id) {
 function esc(str) {
   if (!str) return "";
   return str.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+}
+
+function renderSources(s) {
+  var sources = (s.metadata && Array.isArray(s.metadata.sources)) ? s.metadata.sources : [];
+  if (!sources.length) return '';
+  var h = '<div class="children-section"><h3>Sources (' + sources.length + ')</h3>';
+  sources.forEach(function(r, i) {
+    var url = esc(r.url || '');
+    var title = esc(r.title || r.url || ('Source ' + (i + 1)));
+    h += '<div class="child-item">'
+       + '<span class="type-badge" style="background:color-mix(in srgb, var(--accent) 12%, transparent);color:var(--accent)">SRC</span> '
+       + '<a href="' + url + '" target="_blank" rel="noopener noreferrer"><strong>' + title + '</strong></a>'
+       + '</div>';
+  });
+  h += '</div>';
+  return h;
+}
+
+function renderRunStats(s) {
+  var m = s.metadata || {};
+  // LLM-style fields get their own metaGrid panel — skip them here.
+  // `sources` has its own renderSources panel — skip it too.
+  // Render any other scalar fields as a generic key-value list.
+  var skip = {model:1, prompt_tokens:1, completion_tokens:1,
+              total_tokens:1, cost_usd:1, sources:1, num_sources:1};
+  // num_sources is redundant with the Sources heading — we skip it.
+  var keys = Object.keys(m).filter(function(k){ return !skip[k]; });
+  if (!keys.length) return '';
+  var h = '<div class="children-section"><h3>Run stats</h3>';
+  keys.forEach(function(k) {
+    var v = m[k];
+    var display;
+    if (typeof v === 'number' && /cost/i.test(k)) {
+      display = '$' + v.toFixed(5);
+    } else if (typeof v === 'object' && v !== null) {
+      display = '<pre>' + esc(JSON.stringify(v, null, 2)) + '</pre>';
+    } else {
+      display = esc(String(v));
+    }
+    h += '<div class="child-item"><strong>' + esc(k) + ':</strong> ' + display + '</div>';
+  });
+  h += '</div>';
+  return h;
 }
 
 load();
